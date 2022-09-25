@@ -1,0 +1,23 @@
+// 상호작용
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    TimingManager theTimingManager;
+
+    void Start()
+    {
+        theTimingManager = FindObjectOfType<TimingManager>();
+    }
+
+    void Update()
+    {
+        // 스페이스 바가 눌리면 판정 체크
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            theTimingManager.CheckTiming();
+        }
+    }
+}
