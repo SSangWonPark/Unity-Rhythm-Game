@@ -1,0 +1,135 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+class MusicNote
+{
+    public int eventTime;
+    public int number;
+}
+
+public class NoteManager : MonoBehaviour
+{
+    // AudioSource playTik;
+    public AudioClip tik;
+
+    // BPM
+    // public float musicBPM = 120f;
+    // float stdBPM = 60f;
+    // float musicTempo = 4f;
+    // float stdTempo = 4;
+
+    // float tikTime = 0;
+    // float nextTime = 0;
+
+    // Notes list
+    Queue<MusicNote> notes;
+
+    // note appear transform
+    [SerializeField] Transform[] tfNoteAppear = null;
+
+    TimingManager theTiming;
+    EffectManager theEffect;
+    ComboManager theCombo;
+    StatusManager theStatus;
+    AudioManager theAudio;
+
+    float currentTime;
+
+    void Start()
+    {
+        // playTik = GetComponent<AudioSource>();
+        theTiming = FindObjectOfType<TimingManager>();
+        theEffect = FindObjectOfType<EffectManager>();
+        theCombo = FindObjectOfType<ComboManager>();
+        theStatus = FindObjectOfType<StatusManager>();
+        theAudio = FindObjectOfType<AudioManager>();
+
+        // Load notes data
+        notes = new Queue<MusicNote>();
+        var v = Resources.Load("Notes/a") as TextAsset;
+        var vs = v.text.Split(new[] { '\r', '\n' });
+        foreach (var s in vs)
+        {
+            if (s.Length == 0 || s[0] == '#') continue;
+            var ss = s.Split();
+            var note = new MusicNote();
+            note.eventTime = int.Parse(ss[0]);
+            note.number = int.Parse(ss[1]);
+            notes.Enqueue(note);
+        }
+
+        //  Set current time as 0
+        currentTime = 0.0f;
+    }
+
+    void Update()
+    {
+        // note state true
+        if (GameManager.instance.isStartGameMode && !GameManager.instance.isGamePause)
+        {
+            currentTime += Time.deltaTime * 1000;
+
+            if (notes.Count == 0) return;
+            var note = notes.Peek();
+            // Debug.LogFormat("{0}, {1}", note.eventTime, note.number);
+            if (note.eventTime >= currentTime) return;
+            notes.Dequeue();
+
+            int number = note.number;
+            StartCoroutine(PlayTik(0.0f, number));
+        }
+    }
+
+    IEnumerator PlayTik(float tiktime, int number)
+    {
+        // Dequeue를 이용해 noteQueue에서 노트를 가져옴 || 노트 추가 
+        GameObject t_note = ObjectPool.instance.noteQueue.Dequeue();
+        // 생성 위치 설정
+        t_note.transform.position = tfNoteAppear[number].position;
+        // 노트 활성화
+        t_note.SetActive(true);
+        t_note.transform.localScale = new Vector3(1f, 1f, 0);
+        // 노트 리스트에 t_note 추가
+        theTiming.boxNoteList.Add(t_note);
+
+        yield return new WaitForSeconds(0);
+    }
+
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        // tag가 Note인 것과 충돌 할때 
+        if (collision.tag == "Note")
+        {
+            // 노트의 이미지가 활성화 된 상태일때만
+            if (collision.GetComponent<Note>().GetNoteFlag())
+            {
+                theAudio.PlaySFX("Miss");
+                theStatus.cutHp();
+                theTiming.MissRecord();
+                theEffect.JudgementeffImg(2);
+                theCombo.ResetCombo();
+            }
+            // 충돌한 오브젝트 파괴
+            theTiming.boxNoteList.Remove(collision.gameObject);
+
+            // Enqueue를 이용해 noteQueue에 노트를 반납
+            ObjectPool.instance.noteQueue.Enqueue(collision.gameObject);
+            // 노트 비활성화
+            collision.gameObject.SetActive(false);
+        }
+    }
+
+    public void RemoveNote()
+    {
+        GameManager.instance.isStartGameMode = false;
+
+        for (int i = 0; i < theTiming.boxNoteList.Count; i++)
+        {
+            theTiming.boxNoteList[i].SetActive(false);
+            ObjectPool.instance.noteQueue.Enqueue(theTiming.boxNoteList[i]);
+        }
+    }
+
+}
